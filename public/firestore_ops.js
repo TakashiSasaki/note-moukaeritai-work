@@ -1,7 +1,9 @@
 // Import the functions you need from the SDKs you need
 // initializeApp is likely already called in auth.js, so we might not need it here if db is initialized using the default app.
 // import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, addDoc, getDoc, getDocs, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, addDoc, getDoc, getDocs, deleteDoc, serverTimestamp, query, orderBy, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-functions.js";
+import { app } from "./auth.js"; // Import the initialized app from auth.js
 
 // Assuming firebaseConfig is available from auth.js or initialized similarly
 // If not, you'll need to duplicate or import firebaseConfig here
@@ -9,22 +11,33 @@ import { getFirestore, collection, doc, setDoc, addDoc, getDoc, getDocs, deleteD
 // Ensure auth.js is loaded before this script if relying on window.firebaseConfig
 
 let db;
+let functions; // Firebase Functions instance
 
 try {
-    if (window.firebaseConfig) {
-        // Initialize Firebase (if not already done by auth.js)
-        // const app = initializeApp(window.firebaseConfig); // This might re-initialize if auth.js already did.
-        // It's better to get the existing app instance if auth.js initializes it.
-        // For modular SDK, initializeApp should only be called once.
-        // We will assume auth.js has initialized the app and Firestore can be initialized from the default app.
-        db = getFirestore();
-        console.log("Firestore initialized successfully.");
+    // app is imported from auth.js where it's initialized
+    if (app) {
+        db = getFirestore(app); // Pass app to getFirestore
+        functions = getFunctions(app); // Initialize Firebase Functions
+        console.log("Firestore and Functions initialized successfully using app from auth.js.");
+
+        // Enable Firestore offline persistence
+        enableIndexedDbPersistence(db)
+          .then(() => console.log("Firestore offline persistence enabled."))
+          .catch((err) => {
+            if (err.code === 'failed-precondition') {
+              console.warn("Firestore offline persistence failed: Multiple tabs open or other precondition error. App will still work online.");
+            } else if (err.code === 'unimplemented') {
+              console.warn("Firestore offline persistence failed: Browser does not support it. App will still work online.");
+            } else {
+              console.error("Firestore offline persistence failed with error:", err);
+            }
+          });
+
     } else {
-        console.error("Firebase config not found. Ensure auth.js is loaded first or firebaseConfig is defined.");
-        // Fallback or error handling
+        console.error("Firebase app not imported correctly from auth.js. Firestore & Functions might not work.");
     }
 } catch (error) {
-    console.error("Error initializing Firestore:", error);
+    console.error("Error initializing Firestore, Functions, or Offline Persistence:", error);
 }
 
 
@@ -79,21 +92,6 @@ const createNote = async (userId, noteData) => {
  * Expected structure: { content: "This is an entry.", timestamp: serverTimestamp(), ... }
  */
 const addNoteEntry = async (userId, noteId, entryData) => {
-  if (!db) {
-    console.error("Firestore not initialized.");
-    return;
-  }
-  if (!db) {
-    console.error("Firestore not initialized for addNoteEntry.");
-    throw new Error("Firestore not initialized.");
-  }
-/**
- * Adds a new entry to a specific note for a given user, using a pre-generated entryId.
- * @param {string} userId The ID of the user.
- * @param {string} noteId The ID of the note.
- * @param {string} entryId The pre-generated ID for the new entry.
- * @param {object} entryData The data for the new entry (should include text, imageUrls, links).
- */
 const addNoteEntry = async (userId, noteId, entryId, entryData) => {
   if (!db) {
     console.error("Firestore not initialized for addNoteEntry.");
@@ -315,5 +313,121 @@ window.getUserNotes = getUserNotes;
 window.updateNote = updateNote;
 window.getNoteEntries = getNoteEntries;
 
+/**
+ * Retrieves the read status (lastReadAt) for a specific note.
+ * @param {string} userId The ID of the user.
+ * @param {string} noteId The ID of the note.
+ */
+const getNoteReadStatus = async (userId, noteId) => {
+  if (!db) {
+    console.error("Firestore not initialized for getNoteReadStatus.");
+    throw new Error("Firestore not initialized.");
+  }
+  console.log(`Getting read status for noteId: ${noteId}, userId: ${userId}`);
+  try {
+    const readStatusRef = doc(db, `users/${userId}/noteReadStatus/${noteId}`);
+    const docSnap = await getDoc(readStatusRef);
+    if (docSnap.exists()) {
+      return docSnap.data().lastReadAt || null;
+    }
+    return null;
+  } catch (e) {
+    console.error("Error getting note read status: ", e);
+    throw e; // Re-throw to be caught by caller
+  }
+};
+
+/**
+ * Calls the 'logAccess' Callable Cloud Function.
+ * @param {string} noteId The ID of the note being accessed.
+ * @param {string} type The type of access (e.g., 'read', 'write').
+ * @param {object} customClientInfo Optional custom client info to merge.
+ */
+const callLogAccess = async (noteId, type, customClientInfo = {}) => {
+  if (!functions) {
+    console.error("Firebase Functions service not initialized. Cannot call logAccess.");
+    throw new Error("Firebase Functions service not available.");
+  }
+
+  const logAccessFunction = httpsCallable(functions, 'logAccess');
+
+  const location = { latitude: null, longitude: null }; // Placeholder
+  const network = navigator.connection;
+  const clientInfo = {
+    userAgent: navigator.userAgent,
+    networkInfo: network ? { type: network.type, effectiveType: network.effectiveType } : null,
+    timestamp: new Date().toISOString(),
+    ...customClientInfo
+  };
+
+  const data = {
+    noteId,
+    type,
+    location,
+    clientInfo
+  };
+
+  console.log("Calling logAccess with data:", data);
+  try {
+    const result = await logAccessFunction(data);
+    console.log('logAccess function called successfully, result:', result);
+    return result;
+  } catch (error) {
+    console.error('Error calling logAccess function:', error);
+    // Handle specific errors like 'unauthenticated', 'invalid-argument', 'internal'
+    // alert(`Error logging access: ${error.message}`); // Avoid too many alerts for background tasks
+    throw error;
+  }
+};
+
+window.getNoteReadStatus = getNoteReadStatus;
+window.callLogAccess = callLogAccess;
+
+/**
+ * Calls the 'exportUserData' Callable Cloud Function.
+ */
+const callExportUserData = async () => {
+  if (!functions) {
+    console.error("Firebase Functions service not initialized. Cannot call exportUserData.");
+    throw new Error("Firebase Functions service not available.");
+  }
+  const exportUserDataFunction = httpsCallable(functions, 'exportUserData');
+  console.log("Calling exportUserData function...");
+  try {
+    const result = await exportUserDataFunction();
+    console.log('exportUserData function called successfully, result:', result);
+    // The function is expected to return { data: { downloadUrl: '...', message: '...' } } or similar
+    return result;
+  } catch (error) {
+    console.error('Error calling exportUserData function:', error);
+    throw error;
+  }
+};
+
+/**
+ * Calls the 'importUserData' Callable Cloud Function.
+ * @param {string} storagePath The Cloud Storage path of the uploaded import file.
+ */
+const callImportUserData = async (storagePath) => {
+  if (!functions) {
+    console.error("Firebase Functions service not initialized. Cannot call importUserData.");
+    throw new Error("Firebase Functions service not available.");
+  }
+  const importUserDataFunction = httpsCallable(functions, 'importUserData');
+  const data = { importFilePath: storagePath };
+  console.log("Calling importUserData function with data:", data);
+  try {
+    const result = await importUserDataFunction(data);
+    console.log('importUserData function called successfully, result:', result);
+    // Expected to return { data: { message: '...' } }
+    return result;
+  } catch (error) {
+    console.error('Error calling importUserData function:', error);
+    throw error;
+  }
+};
+
+window.callExportUserData = callExportUserData;
+window.callImportUserData = callImportUserData;
 
 console.log("firestore_ops.js loaded. Firestore functions are available.");

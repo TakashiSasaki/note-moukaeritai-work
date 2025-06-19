@@ -119,4 +119,50 @@ window.uploadImage = uploadImage;
 window.deleteImage = deleteImage;
 window.getDownloadURL = getDownloadURL; // Note: Name clash with internal getDownloadURL, aliased in import.
 
+/**
+ * Uploads a file for data import.
+ * @param {string} userId The ID of the user.
+ * @param {File} file The ZIP file to upload.
+ * @returns {Promise<string>} The full Cloud Storage path of the uploaded file.
+ */
+const uploadImportFile = async (userId, file) => {
+  if (!storage) {
+    console.error("Firebase Storage not initialized for uploadImportFile.");
+    throw new Error("Storage service not available.");
+  }
+  if (!file) {
+    console.error("No file provided for import.");
+    throw new Error("No file provided for import.");
+  }
+  if (!userId) {
+    console.error("User ID is required to upload import file.");
+    throw new Error("User ID required.");
+  }
+
+  const fileName = `${Date.now()}-${file.name}`;
+  const storagePath = `imports/${userId}/${fileName}`; // e.g., imports/USER_ID/timestamp-mydata.zip
+
+  console.log(`Uploading import file for userId: ${userId} to path: ${storagePath}`);
+
+  try {
+    const storageRef = ref(storage, storagePath);
+    const uploadTaskSnapshot = await uploadBytes(storageRef, file);
+    console.log('Uploaded import file:', uploadTaskSnapshot);
+    // For import, we typically return the full gs:// path or just the path,
+    // as the Cloud Function will operate on it directly via Admin SDK.
+    // The Admin SDK uses gs://bucket-name/path/to/file.
+    // The client `ref.fullPath` gives `path/to/file` without the bucket.
+    // The `gsutilURI` on snapshot.ref might be useful if available and needed.
+    // For now, let's return the path that the Admin SDK can use, often just the object path.
+    // The Cloud Function will know its default bucket.
+    console.log(`Import file path for Cloud Function: ${uploadTaskSnapshot.ref.fullPath}`);
+    return uploadTaskSnapshot.ref.fullPath; // This is like "imports/USER_ID/timestamp-mydata.zip"
+  } catch (e) {
+    console.error("Error uploading import file: ", e);
+    throw e;
+  }
+};
+
+window.uploadImportFile = uploadImportFile;
+
 console.log("storage_ops.js loaded. Firebase Storage placeholder functions are available.");

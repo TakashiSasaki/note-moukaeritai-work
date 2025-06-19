@@ -1,3 +1,12 @@
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(registration => console.log('ServiceWorker registration successful with scope: ', registration.scope))
+      .catch(error => console.log('ServiceWorker registration failed: ', error));
+  });
+}
+
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 import { getFirestore, doc, collection } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"; // Added doc, collection
 
@@ -54,8 +63,12 @@ const createNoteHandler = async () => {
 
   try {
     if (window.createNote) {
-      await window.createNote(userId, noteData);
-      console.log("Note creation initiated.");
+      const newNoteId = await window.createNote(userId, noteData); // Assuming createNote returns the new note's ID
+      console.log("Note creation initiated, ID:", newNoteId);
+      if (newNoteId && window.callLogAccess) {
+        window.callLogAccess(newNoteId, 'write', { action: 'createNote' })
+          .catch(err => console.warn("Failed to log write access for createNote:", err));
+      }
       // Clear form
       noteTitleInput.value = '';
       noteTagsInput.value = '';
@@ -98,7 +111,12 @@ const deleteNoteHandler = async (noteId) => {
   try {
     if (window.deleteNote) {
       await window.deleteNote(userId, noteId);
-      console.log("Note deletion initiated.");
+      console.log("Note deletion initiated for ID:", noteId);
+      if (window.callLogAccess) {
+         // Using the noteId that was just deleted for the log.
+        window.callLogAccess(noteId, 'write', { action: 'deleteNote' })
+          .catch(err => console.warn("Failed to log write access for deleteNote:", err));
+      }
       // Refresh notes list
       loadUserNotes();
     } else {
@@ -218,6 +236,24 @@ const showNoteDetailView = async (noteId) => {
   console.log(`Showing detail view for note: ${noteId}`);
 
   try {
+    // Log read access conditionally
+    if (window.getNoteReadStatus && window.callLogAccess) {
+      const lastReadAt = await window.getNoteReadStatus(userId, noteId);
+      // Firestore timestamps can be null or Firestore Timestamp objects
+      const lastReadDate = lastReadAt ? (typeof lastReadAt.toDate === 'function' ? lastReadAt.toDate() : new Date(lastReadAt.seconds * 1000)) : null;
+      const oneHour = 60 * 60 * 1000;
+
+      if (!lastReadDate || (new Date() - lastReadDate) > oneHour) {
+        console.log(`Logging 'read' access for note ${noteId}`);
+        window.callLogAccess(noteId, 'read', { source: 'showNoteDetailView' })
+          .catch(err => console.warn("Failed to log read access:", err)); // Non-critical, so just warn
+      } else {
+        console.log(`Note ${noteId} was read recently. No log needed.`);
+      }
+    } else {
+      console.warn("getNoteReadStatus or callLogAccess not available on window.");
+    }
+
     if (window.getNote) {
       const note = await window.getNote(userId, noteId);
       if (note) {
@@ -289,6 +325,10 @@ const updateNoteHandler = async () => {
     if (window.updateNote) {
       await window.updateNote(userId, currentEditingNoteId, updatedData);
       alert("Note updated successfully!");
+      if (window.callLogAccess) {
+        window.callLogAccess(currentEditingNoteId, 'write', { action: 'updateNote' })
+          .catch(err => console.warn("Failed to log write access for updateNote:", err));
+      }
       // Optionally, refresh just this note's view or go back to list
       // For simplicity, we can just stay on the page. The data is saved.
     } else {
@@ -357,8 +397,12 @@ const addNoteEntryHandler = async () => {
     // 4. Call addNoteEntry with pre-generated entryId
     if (window.addNoteEntry) {
       // Pass entryId to addNoteEntry in firestore_ops.js
-      await window.addNoteEntry(userId, currentEditingNoteId, entryId, entryData);
-
+      const createdEntryId = await window.addNoteEntry(userId, currentEditingNoteId, entryId, entryData);
+      if (createdEntryId && window.callLogAccess) {
+         // Log access for the parent note when an entry is added/modified
+        window.callLogAccess(currentEditingNoteId, 'write', { action: 'addNoteEntry', entryId: createdEntryId })
+          .catch(err => console.warn("Failed to log write access for addNoteEntry:", err));
+      }
       // Clear entry form
       entryTextInput.value = '';
       entryImageFileInput.value = ''; // Clear file input
@@ -495,3 +539,128 @@ if (backToListButton) {
 // Expose showNoteDetailView to be called by note items if needed, or handle internally
 window.appShowNoteDetailView = showNoteDetailView;
 console.log("app.js extended for note detail view and entry management.");
+
+// --- Data Export and Import ---
+const exportDataButton = document.getElementById('export-data-button');
+const importFileInput = document.getElementById('import-file-input');
+const importDataButton = document.getElementById('import-data-button');
+const exportImportStatusDiv = document.getElementById('export-import-status');
+
+const exportDataHandler = async () => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    alert("Please log in to export data.");
+    return;
+  }
+  if(exportImportStatusDiv) exportImportStatusDiv.textContent = "Processing export...";
+  exportDataButton.disabled = true;
+
+  try {
+    if (window.callExportUserData) {
+      const result = await window.callExportUserData();
+      if (result && result.data && result.data.downloadUrl) {
+        if(exportImportStatusDiv) exportImportStatusDiv.textContent = "Export successful! Downloading...";
+        const a = document.createElement('a');
+        a.href = result.data.downloadUrl;
+        a.download = result.data.fileName || "notes-export.zip"; // Cloud function should provide filename
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => {
+            if(exportImportStatusDiv) exportImportStatusDiv.textContent = "Download started.";
+        }, 2000);
+      } else if (result && result.data && result.data.message) { // For placeholder messages
+        if(exportImportStatusDiv) exportImportStatusDiv.textContent = `Export status: ${result.data.message}`;
+         alert(`Export status: ${result.data.message}`);
+      }
+      else {
+        throw new Error("Export function did not return a download URL.");
+      }
+    } else {
+      console.error("window.callExportUserData is not defined.");
+      if(exportImportStatusDiv) exportImportStatusDiv.textContent = "Error: Export function not available.";
+      alert("Error: Export function not available.");
+    }
+  } catch (error) {
+    console.error("Error exporting data:", error);
+    if(exportImportStatusDiv) exportImportStatusDiv.textContent = `Export failed: ${error.message}`;
+    alert(`Export failed: ${error.message}`);
+  } finally {
+    exportDataButton.disabled = false;
+  }
+};
+
+const importDataHandler = async () => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    alert("Please log in to import data.");
+    return;
+  }
+  const userId = currentUser.uid;
+  const file = importFileInput.files[0];
+
+  if (!file) {
+    alert("Please select a ZIP file to import.");
+    return;
+  }
+
+  if(exportImportStatusDiv) exportImportStatusDiv.textContent = "Processing import...";
+  importDataButton.disabled = true;
+  importFileInput.disabled = true;
+
+  try {
+    // 1. Upload the file to Cloud Storage
+    if (!window.uploadImportFile) {
+      throw new Error("Import file upload function not available.");
+    }
+    if(exportImportStatusDiv) exportImportStatusDiv.textContent = "Uploading import file...";
+    const storagePath = await window.uploadImportFile(userId, file);
+    if (!storagePath) {
+      throw new Error("Failed to upload import file or get storage path.");
+    }
+    console.log("Import file uploaded to:", storagePath);
+    if(exportImportStatusDiv) exportImportStatusDiv.textContent = "File uploaded. Starting import process...";
+
+    // 2. Call the importUserData Cloud Function with the storage path
+    if (!window.callImportUserData) {
+      throw new Error("Import data function not available.");
+    }
+    const result = await window.callImportUserData(storagePath);
+
+    if (result && result.data && result.data.message) {
+        if(exportImportStatusDiv) exportImportStatusDiv.textContent = `Import successful: ${result.data.message}`;
+        alert(`Import successful: ${result.data.message}`);
+    } else {
+        throw new Error("Import function did not return a success message or failed.");
+    }
+
+    // 3. Refresh user notes
+    if (window.appLoadUserNotes) {
+      window.appLoadUserNotes();
+    }
+
+  } catch (error) {
+    console.error("Error importing data:", error);
+    if(exportImportStatusDiv) exportImportStatusDiv.textContent = `Import failed: ${error.message}`;
+    alert(`Import failed: ${error.message}`);
+  } finally {
+    importDataButton.disabled = false;
+    importFileInput.disabled = false;
+    importFileInput.value = ''; // Clear the file input
+  }
+};
+
+// Attach event listeners for export/import
+if (exportDataButton) {
+  exportDataButton.addEventListener('click', exportDataHandler);
+} else {
+  console.warn("#export-data-button not found.");
+}
+
+if (importDataButton) {
+  importDataButton.addEventListener('click', importDataHandler);
+} else {
+  console.warn("#import-data-button not found.");
+}
+
+console.log("app.js extended for data export and import.");
