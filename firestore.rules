@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users can read and write their own data, including subcollections.
+    match /users/{userId}/{documents=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Anyone can read documents in the 'publicNotes' collection.
+    match /publicNotes/{noteId} {
+      allow read: if true;
+      allow write: if false; // No client-side writes allowed to publicNotes
+    }
+
+    // Example for a subcollection within publicNotes, if needed in future.
+    // match /publicNotes/{noteId}/someSubCollection/{docId} {
+    //   allow read: if true;
+    //   allow write: if false;
+    // }
+
+    // Deny all other access by default (implicitly, but good to be aware)
+    // match /{document=**} {
+    //   allow read, write: if false;
+    // }
+  }
+}

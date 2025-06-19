@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>My Firebase App</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    .container { max-width: 500px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; }
+    input[type="email"], input[type="password"] { width: calc(100% - 12px); padding: 8px; border: 1px solid #ddd; border-radius: 3px; }
+    button { padding: 10px 15px; margin-right: 10px; background-color: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+    button:hover { background-color: #0056b3; }
+    #user-status { margin-top: 20px; padding: 10px; background-color: #f0f0f0; border: 1px solid #e0e0e0; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Firebase Authentication</h1>
+    <div id="auth-section">
+      <div id="user-status">Not logged in.</div>
+
+      <div id="anonymous-upgrade-prompt" style="display:none; padding: 10px; margin-top: 10px; background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404; border-radius: 3px;">
+        You are currently using an anonymous account. Your data might be temporary. <br>
+        Sign up with Email/Password or Sign in with Google to save your data permanently.
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password">
+      </div>
+
+      <button onclick="handleSignUp()">Sign Up</button>
+      <button onclick="handleSignIn()">Sign In</button>
+      <button onclick="window.signInAnonymouslyHandler()">Sign In Anonymously</button>
+      <button onclick="window.signInWithGoogle()">Sign In with Google</button>
+      <button onclick="window.signOutHandler()">Sign Out</button>
+    </div>
+
+    <hr style="margin: 20px 0;">
+
+    <div id="note-management-section" style="display:none;">
+      <h2>Note Management</h2>
+      <div id="create-note-form">
+        <h3>Create New Note</h3>
+        <div class="form-group">
+          <label for="note-title">Title:</label>
+          <input type="text" id="note-title" required>
+        </div>
+        <div class="form-group">
+          <label for="note-tags">Tags (comma-separated):</label>
+          <input type="text" id="note-tags">
+        </div>
+        <div class="form-group">
+          <label for="note-nfc">NFC Tag ID (optional):</label>
+          <input type="text" id="note-nfc">
+        </div>
+        <div class="form-group">
+          <label for="note-qr">QR Code Data (optional):</label>
+          <input type="text" id="note-qr">
+        </div>
+        <button id="create-note-button">Create Note</button>
+      </div>
+
+      <h3>My Notes</h3>
+      <div id="notes-list">
+        <p>Loading notes...</p>
+        <!-- Notes will be listed here -->
+      </div>
+    </div>
+
+    <hr style="margin: 20px 0;">
+
+    <div id="note-detail-section" style="display:none;">
+      <h2>Note Detail & Entries</h2>
+      <button id="back-to-list-button">Back to Notes List</button>
+      <div id="edit-note-form">
+        <h3>Edit Note Details</h3>
+        <input type="hidden" id="current-note-id"> <!-- To store the ID of the note being edited -->
+        <div class="form-group">
+          <label for="edit-note-title">Title:</label>
+          <input type="text" id="edit-note-title" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-note-tags">Tags (comma-separated):</label>
+          <input type="text" id="edit-note-tags">
+        </div>
+        <div class="form-group">
+          <label for="edit-note-nfc">NFC Tag ID:</label>
+          <input type="text" id="edit-note-nfc">
+        </div>
+        <div class="form-group">
+          <label for="edit-note-qr">QR Code Data:</label>
+          <input type="text" id="edit-note-qr">
+        </div>
+        <button id="update-note-button">Update Note Details</button>
+      </div>
+
+      <div id="entries-management-section">
+        <h3>Note Entries</h3>
+        <div id="add-entry-form">
+          <h4>Add New Entry</h4>
+          <div class="form-group">
+            <label for="entry-text">Text:</label>
+            <textarea id="entry-text" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="entry-image-file">Upload Image (optional):</label>
+            <input type="file" id="entry-image-file" accept="image/*">
+          </div>
+          <div class="form-group">
+            <label for="entry-links">Links to other Note IDs (comma-separated):</label>
+            <input type="text" id="entry-links">
+          </div>
+          <button id="add-entry-button">Add Entry</button>
+        </div>
+        <h4>Existing Entries</h4>
+        <div id="note-entries-list">
+          <p>Loading entries...</p>
+          <!-- Entries will be listed here -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Import Firebase app and auth modules -->
+  <script type="module" src="/auth.js"></script>
+  <script type="module" src="/firestore_ops.js"></script>
+  <script type="module" src="/storage_ops.js"></script>
+  <script type="module" src="/app.js"></script>
+
+
+  <script type="module">
+    // Helper functions to get email and password from input fields
+    // This specific getEmailPassword might be better inside app.js if only used there
+    // Or keep it here if other auth related buttons outside note management use it.
+    window.getEmailPassword = () => { // Expose to window if app.js needs it and it's not moved
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      return { email, password };
+    }
+
+    // Make handlers available in global scope if they are not already
+    window.handleSignUp = () => {
+      const { email, password } = getEmailPassword();
+      if (email && password) {
+        window.createUserWithEmailAndPasswordHandler(email, password);
+      } else {
+        alert("Please enter email and password.");
+      }
+    };
+
+    window.handleSignIn = () => {
+      const { email, password } = getEmailPassword();
+      if (email && password) {
+        window.signInWithEmailAndPasswordHandler(email, password);
+      } else {
+        alert("Please enter email and password.");
+      }
+    };
+
+    // No need to add a new handler for Google Sign In here if
+    // window.signInWithGoogle is directly called from the button's onclick.
+
+    // Log to confirm script part of index.html is running
+    console.log("index.html script modules loaded.");
+  </script>
+</body>
+</html>
