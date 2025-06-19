@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Users can read and write their own files in their user-specific directory.
+    // This covers general user file uploads, like images for notes.
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Users can write to their own export and import directories.
+    // Reading might be handled by Cloud Functions or direct URL if needed,
+    // but client-side read access to these specific paths isn't explicitly granted here,
+    // focusing on write access for initiating exports/imports.
+    match /exports/{userId}/{fileName} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+      // allow read: if request.auth != null && request.auth.uid == userId; // Add if direct client read needed
+    }
+
+    match /imports/{userId}/{fileName} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+      // allow read: if request.auth != null && request.auth.uid == userId; // Add if direct client read needed
+    }
+
+    // Deny all other access by default
+    // match /{allPaths=**} {
+    //   allow read, write: if false;
+    // }
+  }
+}
