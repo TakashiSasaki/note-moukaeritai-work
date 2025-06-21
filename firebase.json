@@ -2,10 +2,13 @@
   "firestore": {
     "rules": "firestore.rules"
   },
-  "functions": {
-    "source": "functions",
-    "runtime": "nodejs20"
-  },
+  "functions": [
+    {
+      "codebase": "note-moukaeritai-work",
+      "source": "functions",
+      "runtime": "nodejs20"
+    }
+  ],
   "hosting": [
     {
       "target": "note-moukaeritai-work",
@@ -20,7 +23,8 @@
           "source": "/notes/**",
           "function": {
             "functionId": "viewNote",
-            "region": "us-central1"
+            "region": "us-central1",
+            "codebase": "note-moukaeritai-work"
           }
         },
         {
