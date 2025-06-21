@@ -49,7 +49,7 @@ This application is a Firebase-based note-taking platform designed for private i
         *   Set up with default security rules (you will deploy updated rules via `firebase deploy`). Select your location.
     *   **Cloud Functions**:
         *   Ensure your project is on the "Blaze (pay as you go)" plan to use Cloud Functions, especially if they make outbound network requests (though current functions primarily interact with other Firebase services).
-        *   The Node.js runtime for functions is specified in `functions/package.json` (e.g., Node 18). Firebase will use this during deployment.
+        *   The Node.js runtime for functions is specified in `functions/package.json` (e.g., Node 20). Firebase will use this during deployment.
 3.  **Web App Configuration**:
     *   In your Firebase project settings (click the gear icon next to "Project Overview"), go to the "General" tab.
     *   Under "Your apps", click the Web icon (`</>`) to add a web app. If you already have one, you can find its config there.
@@ -71,7 +71,7 @@ This application is a Firebase-based note-taking platform designed for private i
 ## Local Development Setup
 
 1.  **Prerequisites**:
-    *   Node.js (version specified in `functions/package.json` or higher, e.g., v18 is used here). You can use [nvm](https://github.com/nvm-sh/nvm) to manage Node.js versions.
+    *   Node.js (version specified in `functions/package.json` or higher, e.g., v20 is used here). You can use [nvm](https://github.com/nvm-sh/nvm) to manage Node.js versions.
     *   Firebase CLI: Install globally using npm: `npm install -g firebase-tools`
 2.  **Clone Repository**:
     ```bash
@@ -96,6 +96,7 @@ This application is a Firebase-based note-taking platform designed for private i
     firebase use --add
     ```
     Select your Firebase project ID from the list and choose an alias (e.g., `default` or `dev`).
+    *   Note: The `firebase.json` in this project is configured for multi-target hosting, with the primary application target named `note-moukaeritai-work`.
 6.  **(Optional) Running with Emulators**:
     The Firebase Local Emulator Suite allows you to run and test Firebase services locally.
     *   Initialize emulators (if not done before): `firebase init emulators` (select Auth, Functions, Firestore, Storage, Hosting).
@@ -103,15 +104,20 @@ This application is a Firebase-based note-taking platform designed for private i
         ```bash
         firebase emulators:start
         ```
-    *   This will typically host your web app on `http://localhost:5000` (check CLI output for specific ports). The client-side Firebase SDKs should automatically connect to the emulators when they are running.
+    *   This will typically host your web app (target `note-moukaeritai-work`) on `http://localhost:5000` (check CLI output for specific ports). The client-side Firebase SDKs should automatically connect to the emulators when they are running.
     *   The Emulator UI will be available at `http://localhost:4000`.
 
 ## Deployment
 
 1.  **Deploy to Firebase**:
-    *   This command deploys your Firebase Hosting assets (HTML, CSS, JS), Firestore rules, Storage rules, and Cloud Functions.
+    *   This project uses a multi-target hosting configuration. The primary application target is named `note-moukaeritai-work`.
+    *   To deploy the hosting configuration for this target, along with other Firebase services like Functions, Firestore rules, and Storage rules, use:
     ```bash
-    firebase deploy
+    firebase deploy --only hosting:note-moukaeritai-work,functions,firestore,storage
+    ```
+    *   To deploy only the specific hosting target:
+    ```bash
+    firebase deploy --only hosting:note-moukaeritai-work
     ```
     *   If you have only changed Firestore rules (and do not have a `firestore.indexes.json` file or it hasn't changed), you can deploy only the rules more quickly using: `firebase deploy --only firestore:rules`. Similarly for Storage rules: `firebase deploy --only storage:rules`.
     *   Ensure you have selected the correct Firebase project (`firebase use <project-alias>`) if you have multiple.
