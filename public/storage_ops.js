@@ -35,11 +35,8 @@ try {
 const uploadImage = async (userId, noteId, entryId, file) => {
   if (!storage) {
     console.error("Firebase Storage not initialized.");
-    return;
-  }
-  if (!file) {
-    console.error("No file provided for upload.");
-    return;
+    // Consider throwing an error or returning a specific failure indicator
+    return null;
   }
   if (!file) {
     console.error("No file provided for uploadImage.");
@@ -47,15 +44,12 @@ const uploadImage = async (userId, noteId, entryId, file) => {
   }
   // Use entryId in the path to associate the image with a specific entry
   const imageFileName = `${Date.now()}-${file.name}`;
-  const storagePath = `users/${userId}/${noteId}/${entryId}/${imageFileName}`;
+  const storagePath = `note/users/${userId}/${noteId}/${entryId}/${imageFileName}`; // Added 'note/' prefix
 
   console.log(`Uploading image for userId: ${userId}, noteId: ${noteId}, entryId: ${entryId} to path: ${storagePath}`);
 
   try {
-    if (!storage) { // Double check storage initialization
-        console.error("Firebase Storage not initialized at point of upload.");
-        throw new Error("Storage service not available.");
-    }
+    // No need to double check storage initialization here if it's done above
     const storageRef = ref(storage, storagePath);
     const uploadTaskSnapshot = await uploadBytes(storageRef, file);
     console.log('Uploaded a blob or file!', uploadTaskSnapshot);
@@ -73,57 +67,64 @@ const uploadImage = async (userId, noteId, entryId, file) => {
  * @param {string} userId The ID of the user.
  * @param {string} noteId The ID of the note.
  * @param {string} entryId The ID of the entry.
- * @param {string} imageFileName The name of the image file to delete.
+ * @param {string} imageFileName The name of the image file to delete. (This should be the full name like 'timestamp-originalName.jpg')
+ * Or, if storing full paths, this could be the full path. For now, assume it's just the file name.
  */
 const deleteImage = async (userId, noteId, entryId, imageFileName) => {
   if (!storage) {
     console.error("Firebase Storage not initialized.");
     return;
   }
-  const imagePath = `users/${userId}/${noteId}/${entryId}/${imageFileName}`;
-  console.log(`Placeholder: deleteImage from path: ${imagePath}`);
-  // Example:
-  // try {
-  //   const storageRef = ref(storage, imagePath);
-  //   await deleteObject(storageRef);
-  //   console.log('File deleted successfully: ', imagePath);
-  // } catch (e) {
-  //   console.error("Error deleting image: ", e);
-  // }
+  // Construct the full path if only filename is passed
+  const imagePath = `note/users/${userId}/${noteId}/${entryId}/${imageFileName}`; // Added 'note/' prefix
+  console.log(`Attempting to delete image from path: ${imagePath}`);
+  try {
+    const storageRef = ref(storage, imagePath);
+    await deleteObject(storageRef);
+    console.log('File deleted successfully: ', imagePath);
+  } catch (e) {
+    console.error("Error deleting image: ", e);
+    // Optionally, handle 'storage/object-not-found' gracefully if needed
+    throw e;
+  }
 };
 
 /**
  * Gets the download URL for a given file path in Firebase Storage.
- * @param {string} fullPath The full path to the file in Firebase Storage.
+ * @param {string} fullPath The full path to the file in Firebase Storage (e.g., 'note/users/UID/NOTEID/ENTRYID/filename.jpg').
  */
 const getDownloadURL = async (fullPath) => {
   if (!storage) {
     console.error("Firebase Storage not initialized.");
-    return;
+    return null;
   }
-  console.log(`Placeholder: getDownloadURL for path: ${fullPath}`);
-  // Example:
-  // try {
-  //   const storageRef = ref(storage, fullPath);
-  //   const url = await getStorageDownloadURL(storageRef);
-  //   console.log('Download URL:', url);
-  //   return url;
-  // } catch (e) {
-  //   console.error("Error getting download URL: ", e);
-  //   // Handle errors (e.g., file not found, unauthorized)
-  // }
+  console.log(`Getting downloadURL for path: ${fullPath}`);
+  try {
+    const storageRef = ref(storage, fullPath);
+    const url = await getStorageDownloadURL(storageRef);
+    console.log('Download URL:', url);
+    return url;
+  } catch (e) {
+    console.error("Error getting download URL: ", e);
+    // Handle errors (e.g., file not found, unauthorized)
+    if (e.code === 'storage/object-not-found') {
+      console.warn(`File not found at path: ${fullPath}`);
+      return null;
+    }
+    throw e;
+  }
 };
 
 // Expose functions to global scope
 window.uploadImage = uploadImage;
 window.deleteImage = deleteImage;
-window.getDownloadURL = getDownloadURL; // Note: Name clash with internal getDownloadURL, aliased in import.
+window.getDownloadURL = getDownloadURL;
 
 /**
  * Uploads a file for data import.
  * @param {string} userId The ID of the user.
  * @param {File} file The ZIP file to upload.
- * @returns {Promise<string>} The full Cloud Storage path of the uploaded file.
+ * @returns {Promise<string>} The full Cloud Storage path of the uploaded file relative to the bucket root.
  */
 const uploadImportFile = async (userId, file) => {
   if (!storage) {
@@ -140,7 +141,7 @@ const uploadImportFile = async (userId, file) => {
   }
 
   const fileName = `${Date.now()}-${file.name}`;
-  const storagePath = `imports/${userId}/${fileName}`; // e.g., imports/USER_ID/timestamp-mydata.zip
+  const storagePath = `note/imports/${userId}/${fileName}`; // Added 'note/' prefix
 
   console.log(`Uploading import file for userId: ${userId} to path: ${storagePath}`);
 
@@ -148,15 +149,9 @@ const uploadImportFile = async (userId, file) => {
     const storageRef = ref(storage, storagePath);
     const uploadTaskSnapshot = await uploadBytes(storageRef, file);
     console.log('Uploaded import file:', uploadTaskSnapshot);
-    // For import, we typically return the full gs:// path or just the path,
-    // as the Cloud Function will operate on it directly via Admin SDK.
-    // The Admin SDK uses gs://bucket-name/path/to/file.
-    // The client `ref.fullPath` gives `path/to/file` without the bucket.
-    // The `gsutilURI` on snapshot.ref might be useful if available and needed.
-    // For now, let's return the path that the Admin SDK can use, often just the object path.
-    // The Cloud Function will know its default bucket.
+    // Return the path relative to the bucket root.
     console.log(`Import file path for Cloud Function: ${uploadTaskSnapshot.ref.fullPath}`);
-    return uploadTaskSnapshot.ref.fullPath; // This is like "imports/USER_ID/timestamp-mydata.zip"
+    return uploadTaskSnapshot.ref.fullPath;
   } catch (e) {
     console.error("Error uploading import file: ", e);
     throw e;
