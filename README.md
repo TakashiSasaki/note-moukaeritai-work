@@ -18,14 +18,11 @@ This application is a Firebase-based note-taking platform designed for private i
     *   Entries can contain text and uploaded images (currently one image per entry via client).
     *   Entries can link to other notes (currently via comma-separated Note IDs).
 *   **Cloud Functions (Backend Logic)**:
-    *   `logAccess`: Callable function to log note access events (read, write) to Firestore, including client details and IP. Updates `noteReadStatus`.
-    *   `updateNoteStats`: Firestore trigger to maintain `noteCount` in user statistics upon note creation/deletion.
-    *   `updateStorageStats`: Cloud Storage trigger to maintain `imageCount` and `totalImageSize` in user statistics upon file upload/deletion.
-    *   `syncPublicNote`: Firestore trigger to synchronize notes marked as `isPublic` to a separate `publicNotes` collection for sharing.
-    *   `viewNote`: HTTP Cloud Function that serves an HTML page for public notes, including OGP tags for social media previews and client-side logic for app deep linking.
-    *   *Note: All functions are part of the `note-moukaeritai-work` codebase.*
+    *   All Cloud Functions are defined within the `note-moukaeritai-work` codebase (see `firebase.json`).
+    *   Functions are grouped and exported from `functions/index.js` under a main `note` object (e.g., `exports.note = { logAccess, viewNote, ... }`). This results in deployed function names being prefixed (e.g., `note-logAccess`, `note-viewNote`).
+    *   Includes: `logAccess` (callable), `updateNoteStats` (Firestore trigger), `updateStorageStats` (Storage trigger), `syncPublicNote` (Firestore trigger), `viewNote` (HTTP).
 *   **Data Management (Client-Side Placeholders)**:
-    *   Client-side UI and function calls for initiating data export (`exportUserData`) and import (`importUserData`). Backend Cloud Functions are currently placeholders.
+    *   Client-side UI and function calls for initiating data export (`exportUserData`) and import (`importUserData`). Backend Cloud Functions are currently placeholders but are defined for future implementation (e.g. `note-exportUserData`).
 *   **Security**:
     *   Firestore security rules to protect user data and manage access to public notes.
     *   Cloud Storage security rules to protect user files and manage access to import/export paths.
@@ -37,68 +34,59 @@ This application is a Firebase-based note-taking platform designed for private i
 
 ## Firebase Project Setup
 
-1.  **Create a Firebase Project**: Go to the [Firebase Console](https://console.firebase.google.com/) and create a new project.
+1.  **Create a Firebase Project**: (As before)
 2.  **Enable Services**:
-    *   **Authentication**:
-        *   Go to Authentication > Sign-in method.
-        *   Enable "Anonymous", "Email/Password", and "Google" providers. For Google Sign-In, ensure you configure the OAuth consent screen and add your authorized domains if prompted.
-    *   **Firestore (Named Database)**:
-        *   This project uses a non-default Firestore database named `note-moukaeritai-work`.
-        *   **Creating the Named Database**: (Instructions as before)
-            *   **Using Firebase Console**: ...
-            *   **Using Google Cloud CLI (`gcloud`)**: ...
-        *   Ensure the database is in "Native Mode".
-    *   **Cloud Storage**:
-        *   Go to Storage > Get started.
-        *   Set up with default security rules. Select your location.
+    *   **Authentication**: (As before)
+    *   **Firestore (Named Database)**: (As before, mentioning `note-moukaeritai-work`)
+    *   **Cloud Storage**: (As before)
     *   **Cloud Functions**:
-        *   Ensure your project is on the "Blaze (pay as you go)" plan.
-        *   The Node.js runtime for functions is specified in `functions/package.json` (e.g., Node 20).
-        *   **Codebase Configuration**: This project configures Cloud Functions under a specific codebase named `note-moukaeritai-work`. The `firebase.json` file defines this, and the `functions` directory (specified as `functions.source`) belongs to this codebase.
-3.  **Web App Configuration**: (Instructions as before)
+        *   Ensure "Blaze (pay as you go)" plan.
+        *   Node.js runtime (e.g., Node 20) set in `functions/package.json`.
+        *   **Codebase & Grouping**: Functions are organized under the `note-moukaeritai-work` codebase in `firebase.json`. Inside `functions/index.js`, they are grouped under an `exports.note` object, leading to deployed names like `note-viewNote`.
+3.  **Web App Configuration**: (As before)
 
 ## Local Development Setup
 
 1.  **Prerequisites**: (As before)
 2.  **Clone Repository** & **Install Dependencies**: (As before)
 3.  **Firebase Login** & **Associate Project**: (As before)
-    *   Note: The `firebase.json` is configured for multi-target hosting (`note-moukaeritai-work`) and a specific function codebase (`note-moukaeritai-work`). The client application also targets the named Firestore database `note-moukaeritai-work`.
-4.  **(Optional) Running with Emulators**: (As before, with a note on function emulators and codebases)
-    *   ...
-    *   When emulating functions from a specific codebase, the Firebase CLI handles this automatically based on `firebase.json`.
+    *   Note: `firebase.json` configures multi-target hosting (`note-moukaeritai-work`), a function codebase (`note-moukaeritai-work`), and the client targets the named Firestore DB (`note-moukaeritai-work`).
+4.  **(Optional) Running with Emulators**: (As before)
+    *   ... Emulators automatically handle functions grouped under a codebase if defined in `firebase.json`.
 
 ## Configuration Details
 
-*   **Client-Side Database**: The client application is specifically configured to connect to the Firestore database named `note-moukaeritai-work`. This configuration is set in `public/firestore_ops.js`.
-*   **Cloud Functions Database Interaction**: **Important**: Cloud Functions in this project (defined in the `functions` directory under the `note-moukaeritai-work` codebase) currently use the *default* Firestore database. To make them target the `note-moukaeritai-work` database, their `admin.firestore()` initialization needs to be updated (e.g., `admin.firestore("note-moukaeritai-work")`). This is not yet implemented.
-*   **Hosting Rewrites**: The rewrite rule in `firebase.json` for the `viewNote` function correctly targets this function within the `note-moukaeritai-work` codebase.
+*   **Client-Side Database**: The client connects to the Firestore database `note-moukaeritai-work` (configured in `public/firestore_ops.js`).
+*   **Cloud Functions Naming**: Due to the grouping in `functions/index.js` (`exports.note = { ... }`), deployed HTTP and callable functions will have names like `note-viewNote`, `note-logAccess`, etc.
+*   **Cloud Functions Database Interaction**: **Important**: Cloud Functions currently use the *default* Firestore database. To target `note-moukaeritai-work`, their `admin.firestore()` initialization needs updating (e.g., `admin.firestore("note-moukaeritai-work")`). This is not yet implemented.
+*   **Hosting Rewrites**: The rewrite rule in `firebase.json` for `/notes/**` correctly targets the `note-viewNote` function (functionId `note-viewNote`) within the `note-moukaeritai-work` codebase.
+*   **Client-Side Callable Function Calls**: Client-side calls to these callable functions (e.g., in `public/firestore_ops.js`) have been updated to use the prefixed names (e.g., `httpsCallable(functions, 'note-logAccess')`).
 
 ## Deployment
 
 1.  **Deploy to Firebase**:
-    *   This project uses multi-target hosting and a specific functions codebase, both named `note-moukaeritai-work`.
-    *   To deploy all services, including the specific hosting target and function codebase:
+    *   Project uses multi-target hosting and a specific functions codebase (`note-moukaeritai-work`).
+    *   Deploy all services (specific hosting target, function codebase, Firestore rules, Storage rules):
     ```bash
     firebase deploy --only hosting:note-moukaeritai-work,functions:note-moukaeritai-work,firestore,storage
     ```
-    *   To deploy only the functions in the `note-moukaeritai-work` codebase:
+    *   Deploy only functions in the `note-moukaeritai-work` codebase:
     ```bash
     firebase deploy --only functions:note-moukaeritai-work
     ```
-    *   To deploy only the specific hosting target:
+    *   Deploy only the specific hosting target:
     ```bash
     firebase deploy --only hosting:note-moukaeritai-work
     ```
-    *   Firestore rules deployment remains generic (as they apply project-wide and paths include database IDs): `firebase deploy --only firestore:rules`.
-    *   Ensure the `note-moukaeritai-work` database exists and that client/functions target the correct database as per "Configuration Details".
-    *   Ensure you have selected the correct Firebase project (`firebase use <project-alias>`).
-    *   Application will be available at your Firebase Hosting URL.
+    *   Firestore rules deployment: `firebase deploy --only firestore:rules`. (These are generic; client/functions must target the named DB).
+    *   Ensure `note-moukaeritai-work` database exists.
+    *   Select correct project alias (`firebase use <project-alias>`).
 
 ## Client Application Usage
 (As previously described)
 
 ## Notes on Current Implementation
-(As previously described, with the function database targeting note reiterated)
+(As previously described, with function database targeting note reiterated)
 *   **Cloud Functions Database Target**: As noted in "Configuration Details", Cloud Functions currently use the default Firestore database. This needs to be updated if they are to interact with the `note-moukaeritai-work` database.
 
 This README provides a comprehensive guide to the application in its current state.
