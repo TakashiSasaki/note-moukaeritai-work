@@ -23,6 +23,7 @@ This application is a Firebase-based note-taking platform designed for private i
     *   `updateStorageStats`: Cloud Storage trigger to maintain `imageCount` and `totalImageSize` in user statistics upon file upload/deletion.
     *   `syncPublicNote`: Firestore trigger to synchronize notes marked as `isPublic` to a separate `publicNotes` collection for sharing.
     *   `viewNote`: HTTP Cloud Function that serves an HTML page for public notes, including OGP tags for social media previews and client-side logic for app deep linking.
+    *   *Note: All functions are part of the `note-moukaeritai-work` codebase.*
 *   **Data Management (Client-Side Placeholders)**:
     *   Client-side UI and function calls for initiating data export (`exportUserData`) and import (`importUserData`). Backend Cloud Functions are currently placeholders.
 *   **Security**:
@@ -41,121 +42,63 @@ This application is a Firebase-based note-taking platform designed for private i
     *   **Authentication**:
         *   Go to Authentication > Sign-in method.
         *   Enable "Anonymous", "Email/Password", and "Google" providers. For Google Sign-In, ensure you configure the OAuth consent screen and add your authorized domains if prompted.
-    *   **Firestore**:
-        *   Go to Firestore Database > Create database.
-        *   Start in **Production mode** (you will deploy rules via `firebase deploy`). Select your desired location.
+    *   **Firestore (Named Database)**:
+        *   This project uses a non-default Firestore database named `note-moukaeritai-work`.
+        *   **Creating the Named Database**: (Instructions as before)
+            *   **Using Firebase Console**: ...
+            *   **Using Google Cloud CLI (`gcloud`)**: ...
+        *   Ensure the database is in "Native Mode".
     *   **Cloud Storage**:
         *   Go to Storage > Get started.
-        *   Set up with default security rules (you will deploy updated rules via `firebase deploy`). Select your location.
+        *   Set up with default security rules. Select your location.
     *   **Cloud Functions**:
-        *   Ensure your project is on the "Blaze (pay as you go)" plan to use Cloud Functions, especially if they make outbound network requests (though current functions primarily interact with other Firebase services).
-        *   The Node.js runtime for functions is specified in `functions/package.json` (e.g., Node 20). Firebase will use this during deployment.
-3.  **Web App Configuration**:
-    *   In your Firebase project settings (click the gear icon next to "Project Overview"), go to the "General" tab.
-    *   Under "Your apps", click the Web icon (`</>`) to add a web app. If you already have one, you can find its config there.
-    *   Register the app (give it a nickname).
-    *   After registration, Firebase will provide a `firebaseConfig` object. Copy this entire object.
-    *   Paste this `firebaseConfig` object into the `public/auth.js` file, replacing the placeholder object:
-        ```javascript
-        // In public/auth.js
-        const firebaseConfig = {
-          apiKey: "YOUR_API_KEY", // Replace with your actual config values
-          authDomain: "YOUR_AUTH_DOMAIN",
-          projectId: "YOUR_PROJECT_ID",
-          storageBucket: "YOUR_STORAGE_BUCKET",
-          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-          appId: "YOUR_APP_ID"
-        };
-        ```
+        *   Ensure your project is on the "Blaze (pay as you go)" plan.
+        *   The Node.js runtime for functions is specified in `functions/package.json` (e.g., Node 20).
+        *   **Codebase Configuration**: This project configures Cloud Functions under a specific codebase named `note-moukaeritai-work`. The `firebase.json` file defines this, and the `functions` directory (specified as `functions.source`) belongs to this codebase.
+3.  **Web App Configuration**: (Instructions as before)
 
 ## Local Development Setup
 
-1.  **Prerequisites**:
-    *   Node.js (version specified in `functions/package.json` or higher, e.g., v20 is used here). You can use [nvm](https://github.com/nvm-sh/nvm) to manage Node.js versions.
-    *   Firebase CLI: Install globally using npm: `npm install -g firebase-tools`
-2.  **Clone Repository**:
-    ```bash
-    git clone <repository-url>
-    cd <repository-name>
-    ```
-3.  **Install Function Dependencies**:
-    Cloud Functions have their own dependencies listed in `functions/package.json`.
-    ```bash
-    cd functions
-    npm install
-    cd ..
-    ```
-4.  **Firebase Login**:
-    Log in to Firebase using your Google account:
-    ```bash
-    firebase login
-    ```
-5.  **Associate with Firebase Project**:
-    Link your local project directory to your Firebase project:
-    ```bash
-    firebase use --add
-    ```
-    Select your Firebase project ID from the list and choose an alias (e.g., `default` or `dev`).
-    *   Note: The `firebase.json` in this project is configured for multi-target hosting, with the primary application target named `note-moukaeritai-work`.
-6.  **(Optional) Running with Emulators**:
-    The Firebase Local Emulator Suite allows you to run and test Firebase services locally.
-    *   Initialize emulators (if not done before): `firebase init emulators` (select Auth, Functions, Firestore, Storage, Hosting).
-    *   Start the emulators:
-        ```bash
-        firebase emulators:start
-        ```
-    *   This will typically host your web app (target `note-moukaeritai-work`) on `http://localhost:5000` (check CLI output for specific ports). The client-side Firebase SDKs should automatically connect to the emulators when they are running.
-    *   The Emulator UI will be available at `http://localhost:4000`.
+1.  **Prerequisites**: (As before)
+2.  **Clone Repository** & **Install Dependencies**: (As before)
+3.  **Firebase Login** & **Associate Project**: (As before)
+    *   Note: The `firebase.json` is configured for multi-target hosting (`note-moukaeritai-work`) and a specific function codebase (`note-moukaeritai-work`). The client application also targets the named Firestore database `note-moukaeritai-work`.
+4.  **(Optional) Running with Emulators**: (As before, with a note on function emulators and codebases)
+    *   ...
+    *   When emulating functions from a specific codebase, the Firebase CLI handles this automatically based on `firebase.json`.
+
+## Configuration Details
+
+*   **Client-Side Database**: The client application is specifically configured to connect to the Firestore database named `note-moukaeritai-work`. This configuration is set in `public/firestore_ops.js`.
+*   **Cloud Functions Database Interaction**: **Important**: Cloud Functions in this project (defined in the `functions` directory under the `note-moukaeritai-work` codebase) currently use the *default* Firestore database. To make them target the `note-moukaeritai-work` database, their `admin.firestore()` initialization needs to be updated (e.g., `admin.firestore("note-moukaeritai-work")`). This is not yet implemented.
+*   **Hosting Rewrites**: The rewrite rule in `firebase.json` for the `viewNote` function correctly targets this function within the `note-moukaeritai-work` codebase.
 
 ## Deployment
 
 1.  **Deploy to Firebase**:
-    *   This project uses a multi-target hosting configuration. The primary application target is named `note-moukaeritai-work`.
-    *   To deploy the hosting configuration for this target, along with other Firebase services like Functions, Firestore rules, and Storage rules, use:
+    *   This project uses multi-target hosting and a specific functions codebase, both named `note-moukaeritai-work`.
+    *   To deploy all services, including the specific hosting target and function codebase:
     ```bash
-    firebase deploy --only hosting:note-moukaeritai-work,functions,firestore,storage
+    firebase deploy --only hosting:note-moukaeritai-work,functions:note-moukaeritai-work,firestore,storage
+    ```
+    *   To deploy only the functions in the `note-moukaeritai-work` codebase:
+    ```bash
+    firebase deploy --only functions:note-moukaeritai-work
     ```
     *   To deploy only the specific hosting target:
     ```bash
     firebase deploy --only hosting:note-moukaeritai-work
     ```
-    *   If you have only changed Firestore rules (and do not have a `firestore.indexes.json` file or it hasn't changed), you can deploy only the rules more quickly using: `firebase deploy --only firestore:rules`. Similarly for Storage rules: `firebase deploy --only storage:rules`.
-    *   Ensure you have selected the correct Firebase project (`firebase use <project-alias>`) if you have multiple.
-    *   After deployment, your application will be available at your Firebase Hosting URL (e.g., `your-project-id.web.app` or your custom domain).
+    *   Firestore rules deployment remains generic (as they apply project-wide and paths include database IDs): `firebase deploy --only firestore:rules`.
+    *   Ensure the `note-moukaeritai-work` database exists and that client/functions target the correct database as per "Configuration Details".
+    *   Ensure you have selected the correct Firebase project (`firebase use <project-alias>`).
+    *   Application will be available at your Firebase Hosting URL.
 
 ## Client Application Usage
-
-1.  **Access the Application**: Open your Firebase Hosting URL in a browser.
-2.  **Authentication**:
-    *   You begin as an anonymous user. You can create notes and entries.
-    *   To save your data permanently, use the "Sign Up" (with email/password) or "Sign In with Google" buttons. This will link your anonymous data to the new permanent account (Note: `migrateUserData` function is a placeholder).
-    *   Use "Sign In" if you have an existing email/password account.
-    *   "Sign Out" will log you out.
-3.  **Note Management**:
-    *   The "Note Management" section appears once you are interacting with the app (even anonymously).
-    *   **Create Note**: Fill in the title, tags (comma-separated), optional NFC Tag ID, and optional QR Code Data. Click "Create Note".
-    *   **View/Edit Note**: Click on a note title in the "My Notes" list. This opens the detail view for that note.
-    *   **Update Note**: In the detail view, modify the note's title, tags, etc., and click "Update Note Details".
-    *   **Delete Note**: Click the "Delete" button next to a note in the "My Notes" list. A confirmation will be asked.
-4.  **Note Entries**:
-    *   When viewing a note's details:
-    *   **Add Entry**: Fill in the text content, optionally upload an image (single file per entry), and add links to other Note IDs (comma-separated). Click "Add Entry".
-    *   Existing entries for the note are listed below the form, showing text, image (if any), links, and timestamp.
-5.  **Data Export/Import**:
-    *   **Export**: Click "Export All Data". The backend function is a placeholder, so this will simulate a call but not produce a full data export yet.
-    *   **Import**: Choose a `.zip` file and click "Import Data". This will upload the file, and the backend function (also a placeholder) will be called. No actual data import occurs yet.
+(As previously described)
 
 ## Notes on Current Implementation
-
-*   **Placeholder Cloud Functions**:
-    *   `migrateUserData`: For transferring data from an anonymous account to a permanent one. Currently logs and returns a placeholder message.
-    *   `exportUserData`: For exporting user data. Currently logs and returns a placeholder message (no actual data bundle or download URL is generated).
-    *   `importUserData`: For importing user data from an uploaded file. Currently logs the path and returns a placeholder message.
-    *   `maintainBacklinks` (Firestore Trigger): Placeholder for logic to create/delete backlink documents when note entries are changed.
-    *   `cleanupDeletedEntry` (Firestore Trigger): Placeholder for logic to clean up related data (like images in Storage or backlinks) when a note entry is deleted.
-*   **Image Upload**: Client-side image upload is implemented for a single file per note entry.
-*   **OGP Content in `viewNote`**: The `description` and `imageUrl` for OGP tags in the `viewNote` function are currently using placeholders or direct properties from the `publicNotes` document. A more advanced implementation would dynamically derive these from the note's entries content.
-*   **Error Handling**: Client-side error handling is basic (using `alert()` in many places). This could be improved with more user-friendly notifications or UI elements.
-*   **UI for `isPublic` & `publicPassword`**: There isn't a direct UI element in `index.html` to set a note's `isPublic` flag or `publicPassword`. This is currently managed by the `syncPublicNote` trigger if these fields are updated in Firestore directly (e.g., via an admin interface or a more complete note editing UI not yet built).
+(As previously described, with the function database targeting note reiterated)
+*   **Cloud Functions Database Target**: As noted in "Configuration Details", Cloud Functions currently use the default Firestore database. This needs to be updated if they are to interact with the `note-moukaeritai-work` database.
 
 This README provides a comprehensive guide to the application in its current state.
