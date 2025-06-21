@@ -16,9 +16,9 @@ let functions; // Firebase Functions instance
 try {
     // app is imported from auth.js where it's initialized
     if (app) {
-        db = getFirestore(app); // Pass app to getFirestore
+        db = getFirestore(app, "note-moukaeritai-work"); // Pass app and databaseId to getFirestore
         functions = getFunctions(app); // Initialize Firebase Functions
-        console.log("Firestore and Functions initialized successfully using app from auth.js.");
+        console.log("Firestore (for 'note-moukaeritai-work' DB) and Functions initialized successfully using app from auth.js.");
 
         // Enable Firestore offline persistence
         enableIndexedDbPersistence(db)
@@ -88,11 +88,10 @@ const createNote = async (userId, noteData) => {
  * Adds a new entry to a specific note for a given user.
  * @param {string} userId The ID of the user.
  * @param {string} noteId The ID of the note.
- * @param {object} entryData The data for the new entry.
- * Expected structure: { content: "This is an entry.", timestamp: serverTimestamp(), ... }
+ * @param {object} entryData The data for the new entry (should include text, imageUrls, links).
  */
-const addNoteEntry = async (userId, noteId, entryData) => {
-const addNoteEntry = async (userId, noteId, entryId, entryData) => {
+// const addNoteEntry = async (userId, noteId, entryData) => { // This is the old signature, remove or comment out
+const addNoteEntry = async (userId, noteId, entryId, entryData) => { // Correct signature
   if (!db) {
     console.error("Firestore not initialized for addNoteEntry.");
     throw new Error("Firestore not initialized.");
