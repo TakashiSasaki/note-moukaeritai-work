@@ -348,7 +348,7 @@ const callLogAccess = async (noteId, type, customClientInfo = {}) => {
     throw new Error("Firebase Functions service not available.");
   }
 
-  const logAccessFunction = httpsCallable(functions, 'logAccess');
+  const logAccessFunction = httpsCallable(functions, 'note-logAccess');
 
   const location = { latitude: null, longitude: null }; // Placeholder
   const network = navigator.connection;
@@ -390,7 +390,7 @@ const callExportUserData = async () => {
     console.error("Firebase Functions service not initialized. Cannot call exportUserData.");
     throw new Error("Firebase Functions service not available.");
   }
-  const exportUserDataFunction = httpsCallable(functions, 'exportUserData');
+  const exportUserDataFunction = httpsCallable(functions, 'note-exportUserData');
   console.log("Calling exportUserData function...");
   try {
     const result = await exportUserDataFunction();
@@ -412,7 +412,7 @@ const callImportUserData = async (storagePath) => {
     console.error("Firebase Functions service not initialized. Cannot call importUserData.");
     throw new Error("Firebase Functions service not available.");
   }
-  const importUserDataFunction = httpsCallable(functions, 'importUserData');
+  const importUserDataFunction = httpsCallable(functions, 'note-importUserData');
   const data = { importFilePath: storagePath };
   console.log("Calling importUserData function with data:", data);
   try {

@@ -188,7 +188,7 @@ const requestDataMigration = (conflictingCredential, anonymousUserUid) => {
   // Example of how you might call the function (ensure you have getFunctions and httpsCallable from 'firebase/functions'):
   // import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-functions.js";
   // const functions = getFunctions(getApp()); // Assuming getApp() is available or app is passed
-  // const migrateUserDataFn = httpsCallable(functions, 'migrateUserData');
+  // const migrateUserDataFn = httpsCallable(functions, 'note-migrateUserData'); // Updated to note-migrateUserData
   // migrateUserDataFn(migrationPayload)
   //   .then((result) => {
   //     console.log('migrateUserData callable function returned:', result);

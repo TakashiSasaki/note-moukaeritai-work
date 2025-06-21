@@ -22,7 +22,7 @@
         {
           "source": "/notes/**",
           "function": {
-            "functionId": "viewNote",
+            "functionId": "note-viewNote",
             "region": "us-central1",
             "codebase": "note-moukaeritai-work"
           }
