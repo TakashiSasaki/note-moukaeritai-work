@@ -25,7 +25,7 @@ This application is a Firebase-based note-taking platform designed for private i
     *   Client-side UI and function calls for initiating data export (`exportUserData`) and import (`importUserData`). Backend Cloud Functions are currently placeholders but are defined for future implementation (e.g. `note-exportUserData`).
 *   **Security**:
     *   Firestore security rules to protect user data and manage access to public notes.
-    *   Cloud Storage security rules to protect user files and manage access to import/export paths.
+    *   Cloud Storage security rules to protect user files and manage access to import/export paths. These rules have been updated to reflect the `note/` top-level directory structure for all application files.
 *   **User Experience**:
     *   Basic responsive UI for improved usability on different screen sizes.
     *   Offline support:
@@ -59,6 +59,11 @@ This application is a Firebase-based note-taking platform designed for private i
 *   **Client-Side Database**: The client connects to the Firestore database `note-moukaeritai-work` (configured in `public/firestore_ops.js`).
 *   **Cloud Functions Naming**: Due to the grouping in `functions/index.js` (`exports.note = { ... }`), deployed HTTP and callable functions will have names like `note-viewNote`, `note-logAccess`, etc.
 *   **Cloud Functions Database Interaction**: **Important**: Cloud Functions currently use the *default* Firestore database. To target `note-moukaeritai-work`, their `admin.firestore()` initialization needs updating (e.g., `admin.firestore("note-moukaeritai-work")`). This is not yet implemented.
+*   **Cloud Storage Path Structure**: All application-specific files in Cloud Storage are stored under a top-level `note/` directory. This applies to:
+    *   User images: `note/users/{userId}/{noteId}/{entryId}/{imageFileName}`
+    *   Data exports: `note/exports/{userId}/{timestamp}.zip`
+    *   Data imports: `note/imports/{userId}/{timestamp}.zip`
+    *   The `storage.rules` file has been updated to enforce security based on these prefixed paths.
 *   **Hosting Rewrites**: The rewrite rule in `firebase.json` for `/notes/**` correctly targets the `note-viewNote` function (functionId `note-viewNote`) within the `note-moukaeritai-work` codebase.
 *   **Client-Side Callable Function Calls**: Client-side calls to these callable functions (e.g., in `public/firestore_ops.js`) have been updated to use the prefixed names (e.g., `httpsCallable(functions, 'note-logAccess')`).
 
@@ -79,6 +84,7 @@ This application is a Firebase-based note-taking platform designed for private i
     firebase deploy --only hosting:note-moukaeritai-work
     ```
     *   Firestore rules deployment: `firebase deploy --only firestore:rules`. (These are generic; client/functions must target the named DB).
+    *   Storage rules deployment: `firebase deploy --only storage:rules`.
     *   Ensure `note-moukaeritai-work` database exists.
     *   Select correct project alias (`firebase use <project-alias>`).
 
